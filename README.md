@@ -146,3 +146,50 @@ net localgroup "Remote Desktop Users" "mleejones\cbrown" /add
 
 Validated standard user boundaries utilizing deterministic UAC gating and directory permission isolation to confirm strict privilege separation.
 ---
+## Phase 2.7: Fine-Grained Password Policies (FGPP) & Privilege Isolation
+
+To enforce the Principle of Least Privilege (PoLP) and establish strict identity boundaries, a domain-wide "one-size-fits-all" security posture was rejected. High-privilege administrative accounts require a significantly more rigorous security envelope than standard business identities. 
+
+A custom Password Settings Object (PSO) was programmatically provisioned and linked directly to the `Domain Admins` security principal to override default domain constraints without modifying the underlying forest schema.
+
+### 🛠️ Programmatic PSO Deployment & Group Mapping
+
+The policy enforces a strict 16-character minimum passpharase length and a compressed 60-day maximum lifetime window, backed by an aggressive 3-strike account lockout gating mechanism.
+
+```powershell
+# 1. Create the Fine-Grained Password Settings Object (PSO)
+New-ADFineGrainedPasswordPolicy -Name "PSO_Strict_Admin_Policy" `
+    -Precedence 10 `
+    -ComplexityEnabled $true `
+    -MinPasswordLength 16 `
+    -MaxPasswordAge (New-TimeSpan -Days 60) `
+    -LockoutThreshold 3 `
+    -LockoutDuration (New-TimeSpan -Minutes 30) `
+    -LockoutObservationWindow (New-TimeSpan -Minutes 30)
+
+# 2. Assign the PSO to the Administrative Security Group
+Add-ADFineGrainedPasswordPolicySubject -Identity "PSO_Strict_Admin_Policy" -Subjects "Domain Admins"
+```
+
+### 🔍 Deterministic Verification & Validation Loop
+
+Active Directory utilizes a "silent baseline" logic when evaluating resultant password policies—returning null output if an identity is merely inheriting the base domain rules. To validate the inheritance override, a multi-stage testing pipeline was executed using a temporary privilege promotion loop.
+
+```powershell
+# Stage 1: Initial out-of-group evaluation (Expected: Null/No Output)
+Get-ADUserResultantPasswordPolicy -Identity "asmith"
+
+# Stage 2: Temporal Security Principal Escalation
+Add-ADGroupMember -Identity "Domain Admins" -Members "asmith"
+
+# Stage 3: Resultant Policy Evaluation (Expected: Explicit PSO Matrix Output)
+Get-ADUserResultantPasswordPolicy -Identity "asmith"
+
+# Stage 4: Strict De-escalation & Environment Cleanup (Enforcing Least Privilege)
+Remove-ADGroupMember -Identity "Domain Admins" -Members "asmith" -Confirm:$false
+```
+
+### 🎯 Resultant Operational Metrics
+- **Standard User Boundary:** Successfully validated that standard user identities default seamlessly to the base 12-character / 90-day structural policy.
+- **Administrative Isolation:** Confirmed that any security principal injected into the administrative container automatically intercepts the stricter 16-character constraint with zero administrative GUI dependency.
+- **Privilege Integrity:** Confirmed that executing the `Remove-ADGroupMember` pipeline instantly strips the resultant policy object and forces the target identity back to standard compliance limits.
