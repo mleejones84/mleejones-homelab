@@ -193,3 +193,64 @@ Remove-ADGroupMember -Identity "Domain Admins" -Members "asmith" -Confirm:$false
 - **Standard User Boundary:** Successfully validated that standard user identities default seamlessly to the base 12-character / 90-day structural policy.
 - **Administrative Isolation:** Confirmed that any security principal injected into the administrative container automatically intercepts the stricter 16-character constraint with zero administrative GUI dependency.
 - **Privilege Integrity:** Confirmed that executing the `Remove-ADGroupMember` pipeline instantly strips the resultant policy object and forces the target identity back to standard compliance limits.
+---
+## Phase 2.8: Group Policy Objects (GPO) Architecture & Inheritance Diagnostics
+
+To enforce configuration standards across the enterprise simulation boundary, a modular Group Policy Object (GPO) infrastructure was deployed. Rather than utilizing clunky, non-scalable local modifications, structural system parameters were bound natively to the Organizational Unit (OU) typography using the industry-standard Functional-Scope Tiering methodology.
+
+### 🏛️ Functional GPO Distribution Topology
+
+- **User-Tier Object (`User_Desktop_Restrictions`):** Linked to the `Standard_Users` OU path. Enforces identity-level security profiles across the `HKEY_CURRENT_USER` (HKCU) registry hive, mandating a strict 15-minute (900 seconds) workstation idle screen-saver lockout.
+- **Machine-Tier Object (`Sec_Workstation_Hardening`):** Linked to the `Workstations` OU path. Binds configuration compliance directly to the physical/virtual computer layer (`HKEY_LOCAL_MACHINE`), disabling local guest databases and restricting automated system printing driver allocations to local administrators.
+
+### 🛠️ Scripted GPO Object Provisioning & Dynamic Path Alignment
+
+To eliminate human entry errors and bypass replication timing race-conditions (HRESULT: `0x80005000` / `ADS_BAD_PATHNAME`), target container strings were harvested dynamically from the active directory database layer to forge explicit link paths.
+
+```powershell
+# 1. Provision User-Tier Compliance Object with Replication Sleep Buffer
+New-GPO -Name "User_Desktop_Restrictions" -Comment "Enforces user workspace compliance and idle lockouts"
+Start-Sleep -Seconds 2
+
+# 2. Inject Workspace Security Controls into HKCU Hive
+Set-GPRegistryValue -Name "User_Desktop_Restrictions" -Key "HKCU\Software\Policies\Microsoft\Windows\Control Panel\Desktop" -ValueName "ScreenSaveActive" -Type String -Value "1"
+Set-GPRegistryValue -Name "User_Desktop_Restrictions" -Key "HKCU\Software\Policies\Microsoft\Windows\Control Panel\Desktop" -ValueName "ScreenSaverIsSecure" -Type String -Value "1"
+Set-GPRegistryValue -Name "User_Desktop_Restrictions" -Key "HKCU\Software\Policies\Microsoft\Windows\Control Panel\Desktop" -ValueName "ScreenSaveTimeOut" -Type String -Value "900"
+
+# 3. Dynamic Path Resolution & Interface Link Execution
+$TrueUserOUPath = (Get-ADOrganizationalUnit -Filter "Name -eq 'Standard_Users'").DistinguishedName
+New-GPLink -Name "User_Desktop_Restrictions" -Target $TrueUserOUPath -LinkEnabled Yes
+```
+
+### 🕵️‍♂️ Advanced Troubleshooting Case Study: Sabotage & Telemetry Diagnostics
+
+To simulate a tier-2 service desk incident and analyze active directory failure states, a deliberate, two-stage infrastructure sabotage loop was engineered completely through the command-line interface.
+
+#### Scenario 1: Upstream Inheritance Interception
+An administrative injection was executed to block upstream inheritance on the target machine container using low-level database modifiers (`gpOptions = 1`). 
+
+```powershell
+# Execute parent container inheritance blockade via DC CLI
+Set-ADObject -Identity (Get-ADOrganizationalUnit -Filter "Name -eq 'Workstations'").DistinguishedName -Replace @{gpOptions = 1}
+```
+
+- **Diagnostic Telemetry Evaluation:** Client-side diagnostics (`gpresult /scope computer /r`) exposed that the `Default Domain Policy` was successfully intercepted and moved to the filtered register (`Filtering: Not Applied (Unknown Reason)`).
+- **Architectural Discovery:** The `Sec_Workstation_Hardening` object bypasses the blockade entirely and remains actively applied. This proves that container-level inheritance blocks cannot override policies linked *directly* to the endpoint's localized container.
+
+#### Scenario 2: Explicit Structural Link Severance
+To induce a true baseline outage, the direct link state was programmatically disabled at the directory tier.
+
+```powershell
+# Sever the direct linkage path via DC CLI
+Set-GPLink -Name "Sec_Workstation_Hardening" -Target (Get-ADOrganizationalUnit -Filter "Name -eq 'Workstations'").DistinguishedName -LinkEnabled No
+```
+
+- **Diagnostic Telemetry Evaluation:** Forcing a policy refresh (`gpupdate /force`) under an authentic `runas` administrative security token successfully captured the target failure state, exposing the explicit diagnostic root cause:
+  ```text
+  The following GPOs were not applied because they were filtered out:
+      Sec_Workstation_Hardening
+          Filtering:  Disabled (Link)
+  ```
+
+### 🎯 Operational Verification Result
+Environment successfully restored to a healthy production baseline. The testing cycle validates full technical competency in client-side telemetry analysis, multi-layered UAC privilege execution, and the underlying mathematical processing logic of Active Directory Group Policy inheritance.
